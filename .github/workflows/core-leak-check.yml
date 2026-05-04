@@ -1,0 +1,27 @@
+name: Core Leak Check
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if repo is public
+        id: visibility
+        run: |
+          VISIBILITY=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}"             "https://api.github.com/repos/${{ github.repository }}" | jq -r '.visibility')
+          echo "visibility=$VISIBILITY" >> $GITHUB_OUTPUT
+
+      - name: Block core business code in public repos
+        if: steps.visibility.outputs.visibility == 'public'
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || echo "")
+          BLOCKED=$(echo "$CHANGED" | grep -E '^(AI/|core/|backend/|gpu/)' || true)
+          if [ -n "$BLOCKED" ]; then
+            echo "::error::FORBIDDEN: Core business code ($BLOCKED) cannot be committed to public repos"
+            exit 1
+          fi
