@@ -1,0 +1,42 @@
+name: Skill Security Audit
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'skills/**'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check skill has SKILL.md
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || echo "")
+          SKILL_DIRS=$(echo "$CHANGED" | grep -oP 'skills/[^/]+' | sort -u || true)
+          for dir in $SKILL_DIRS; do
+            if [ ! -f "${dir}/SKILL.md" ]; then
+              echo "::error::FORBIDDEN: Skill ${dir} missing SKILL.md (required for all skills)"
+              exit 1
+            fi
+          done
+
+      - name: Check skill has no executable scripts without review
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || echo "")
+          EXECS=$(echo "$CHANGED" | grep -E '\.(sh|bat|ps1|py)$' | head -20 || true)
+          if [ -n "$EXECS" ]; then
+            echo "::warning::Executable scripts changed (ensure manual review):"
+            echo "$EXECS"
+          fi
+
+      - name: Check for network calls in skill
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || echo "")
+          NETWORK=$(echo "$CHANGED" | xargs grep -lE '(requests\.get|fetch\(|http\.post|curl|wget)' 2>/dev/null || true)
+          if [ -n "$NETWORK" ]; then
+            echo "::warning::Skill makes network calls (manual security review required):"
+            echo "$NETWORK"
+          fi
