@@ -7,6 +7,7 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -14,6 +15,7 @@ jobs:
 
       - name: Check for real credentials in config files
         run: |
+          set +e
           CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || true)
           CONFIGS=$(echo "$CHANGED" | grep -E '(CONFIG\.yaml|\.env|config\.json)$' || true)
           if [ -n "$CONFIGS" ]; then
@@ -29,6 +31,7 @@ jobs:
 
       - name: Check for workbuddy config
         run: |
+          set +e
           CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || true)
           WB=$(echo "$CHANGED" | grep -E '\.workbuddy/' || true)
           if [ -n "$WB" ]; then
