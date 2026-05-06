@@ -28,3 +28,7 @@ Real credentials are managed via environment variables and never committed.
 ## License
 
 MIT
+
+## POS Test
+
+Epic SOP integration test - 2026-05-06.
