@@ -12,24 +12,35 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for real credentials in config files
-        run: |
-          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || true)
-          CONFIGS=$(echo "$CHANGED" | grep -E '(\.yaml|\.env|config\.json)$' || true)
-          if [ -n "$CONFIGS" ]; then
-            for f in $CONFIGS; do
-              if grep -qE '(app_id|app_secret|api_key|password|token)\s*[:=]\s*['\''"][a-zA-Z0-9]{20,}'\'' "$f" 2>/dev/null; then
-                printf '%s\n' '::error::FORBIDDEN: Possible real credential in '"$f"
-                exit 1
-              fi
-            done
-            printf '%s\n' 'Config files reviewed: '"$CONFIGS"
-          fi
+      - name: Run audit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            const fs = require('fs');
+            const pr = context.payload.pull_request;
+            const base = pr.base.sha;
+            const head = context.sha;
+            let changed;
+            try {
+              changed = execSync(`git diff --name-only ${base} ${head}`, {encoding: 'utf8'}).trim();
+            } catch (e) { changed = ''; }
 
-      - name: Check for workbuddy config
-        run: |
-          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || true)
-          if echo "$CHANGED" | grep -q '\.workbuddy/'; then
-            printf '%s\n' '::error::FORBIDDEN: .workbuddy/ config must NEVER be committed'
-            exit 1
-          fi
+            // Check 1: real credentials in config files
+            const configs = changed.split('\n').filter(f => /\.yaml$|\.env$|config\.json$/.test(f));
+            if (configs.length > 0) {
+              for (const f of configs) {
+                if (!fs.existsSync(f)) continue;
+                const content = fs.readFileSync(f, 'utf8');
+                if (/(app_id|app_secret|api_key|password|token)\s*[:=]\s*['\"][a-zA-Z0-9]{20,}/.test(content)) {
+                  core.setFailed('FORBIDDEN: Possible real credential in ' + f);
+                  return;
+                }
+              }
+              console.log('Config files reviewed: ' + configs.join(', '));
+            }
+
+            // Check 2: .workbuddy config
+            if (/\.workbuddy\//.test(changed)) {
+              core.setFailed('FORBIDDEN: .workbuddy/ config must NEVER be committed');
+            }
