@@ -14,12 +14,11 @@ jobs:
 
       - name: Check for real credentials in config files
         run: |
-          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || echo "")
-          CONFIGS=$(echo "$CHANGED" | grep -E '(CONFIG\.yaml|\.env|config\.json)$' || true)
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || true)
+          CONFIGS=$(echo "$CHANGED" | grep -E '(CONFIG\\.yaml|\\.env|config\\.json)$' || true)
           if [ -n "$CONFIGS" ]; then
             for f in $CONFIGS; do
-              # Check for patterns that look like real credentials (not placeholders)
-              if grep -qE '(app_id|app_secret|api_key|password|token)\s*[:=]\s*["'][a-zA-Z0-9]{20,}' "$f" 2>/dev/null; then
+              if grep -qE '(app_id|app_secret|api_key|password|token)\\s*[:=]\\s*["'][a-zA-Z0-9]{20,}' "$f" 2>/dev/null; then
                 echo "::error::FORBIDDEN: Possible real credential in $f"
                 exit 1
               fi
@@ -29,8 +28,8 @@ jobs:
 
       - name: Check for workbuddy config
         run: |
-          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || echo "")
-          WB=$(echo "$CHANGED" | grep -E '\.workbuddy/' || true)
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || true)
+          WB=$(echo "$CHANGED" | grep -E '\\.workbuddy/' || true)
           if [ -n "$WB" ]; then
             echo "::error::FORBIDDEN: .workbuddy/ config must NEVER be committed"
             exit 1
